@@ -31,7 +31,7 @@ internal sealed class FunctionApprovalRequestEventGenerator(
         {
             SequenceNumber = seq.Increment(),
             OutputIndex = outputIndex,
-            RequestId = approvalRequest.Id,
+            RequestId = approvalRequest.RequestId,
             ItemId = idGenerator.GenerateMessageId(),
             FunctionCall = new FunctionCallInfo
             {

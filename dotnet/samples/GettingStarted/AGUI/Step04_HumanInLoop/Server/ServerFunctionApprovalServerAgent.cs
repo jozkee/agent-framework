@@ -68,7 +68,7 @@ internal sealed class ServerFunctionApprovalAgent : DelegatingAIAgent
         }
 
         return new FunctionApprovalRequestContent(
-            id: request.ApprovalId,
+            requestId: request.ApprovalId,
             new FunctionCallContent(
                 callId: request.ApprovalId,
                 name: request.FunctionName,
@@ -185,7 +185,7 @@ internal sealed class ServerFunctionApprovalAgent : DelegatingAIAgent
             {
                 updatedContents ??= [.. update.Contents];
                 var functionCall = request.FunctionCall;
-                var approvalId = request.Id;
+                var approvalId = request.RequestId;
 
                 var approvalData = new ApprovalRequest
                 {

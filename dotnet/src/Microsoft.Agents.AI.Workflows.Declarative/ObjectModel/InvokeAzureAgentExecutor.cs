@@ -149,7 +149,7 @@ internal sealed class InvokeAzureAgentExecutor(InvokeAzureAgent model, WorkflowA
 
         foreach (ChatMessage responseMessage in agentResponse.Messages)
         {
-            if (responseMessage.Contents.Any(content => content is UserInputRequestContent))
+            if (responseMessage.Contents.Any(content => content is InputRequestContent))
             {
                 yield return responseMessage;
                 continue;

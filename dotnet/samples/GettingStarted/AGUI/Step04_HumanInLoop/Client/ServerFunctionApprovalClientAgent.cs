@@ -53,11 +53,11 @@ internal sealed class ServerFunctionApprovalClientAgent : DelegatingAIAgent
     private static FunctionResultContent ConvertApprovalResponseToToolResult(FunctionApprovalResponseContent approvalResponse, JsonSerializerOptions jsonOptions)
     {
         return new FunctionResultContent(
-            callId: approvalResponse.Id,
+            callId: approvalResponse.RequestId,
             result: JsonSerializer.SerializeToElement(
                 new ApprovalResponse
                 {
-                    ApprovalId = approvalResponse.Id,
+                    ApprovalId = approvalResponse.RequestId,
                     Approved = approvalResponse.Approved
                 },
                 jsonOptions));
@@ -106,17 +106,17 @@ internal sealed class ServerFunctionApprovalClientAgent : DelegatingAIAgent
                     approvalRequest.AdditionalProperties?.TryGetValue("original_function", out var originalFunction) == true &&
                     originalFunction is FunctionCallContent original)
                 {
-                    approvalRequests[approvalRequest.Id] = approvalRequest;
+                    approvalRequests[approvalRequest.RequestId] = approvalRequest;
                     transformedContents ??= CopyContentsUpToIndex(message.Contents, contentIndex);
                     transformedContents.Add(original);
                 }
                 // Handle pending approval responses (transform to tool result)
                 else if (content is FunctionApprovalResponseContent approvalResponse &&
-                    approvalRequests.TryGetValue(approvalResponse.Id, out var correspondingRequest))
+                    approvalRequests.TryGetValue(approvalResponse.RequestId, out var correspondingRequest))
                 {
                     transformedContents ??= CopyContentsUpToIndex(message.Contents, contentIndex);
                     transformedContents.Add(ConvertApprovalResponseToToolResult(approvalResponse, jsonSerializerOptions));
-                    approvalRequests.Remove(approvalResponse.Id);
+                    approvalRequests.Remove(approvalResponse.RequestId);
                     correspondingRequest.AdditionalProperties?.Remove("original_function");
                 }
                 // Skip historical approval content
@@ -199,7 +199,7 @@ internal sealed class ServerFunctionApprovalClientAgent : DelegatingAIAgent
                     .Deserialize(jsonSerializerOptions.GetTypeInfo(typeof(Dictionary<string, object?>)));
 
                 var approvalRequestContent = new FunctionApprovalRequestContent(
-                    id: approvalRequest.ApprovalId,
+                    requestId: approvalRequest.ApprovalId,
                     new FunctionCallContent(
                         callId: approvalRequest.ApprovalId,
                         name: approvalRequest.FunctionName,

@@ -306,7 +306,6 @@ internal sealed class WorkflowRunner
                 {
                     FunctionCallContent functionCall => await InvokeFunctionAsync(functionCall).ConfigureAwait(false),
                     FunctionApprovalRequestContent functionApprovalRequest => ApproveFunction(functionApprovalRequest),
-                    McpServerToolApprovalRequestContent mcpApprovalRequest => ApproveMCP(mcpApprovalRequest),
                     _ => HandleUnknown(requestItem),
                 };
 
@@ -328,12 +327,6 @@ internal sealed class WorkflowRunner
         {
             Notify($"INPUT - Approving Function: {functionApprovalRequest.FunctionCall.Name}");
             return new ChatMessage(ChatRole.User, [functionApprovalRequest.CreateResponse(approved: true)]);
-        }
-
-        ChatMessage ApproveMCP(McpServerToolApprovalRequestContent mcpApprovalRequest)
-        {
-            Notify($"INPUT - Approving MCP: {mcpApprovalRequest.ToolCall.ToolName}");
-            return new ChatMessage(ChatRole.User, [mcpApprovalRequest.CreateResponse(approved: true)]);
         }
 
         async Task<ChatMessage> InvokeFunctionAsync(FunctionCallContent functionCall)

@@ -29,7 +29,7 @@ internal sealed class FunctionApprovalResponseEventGenerator(
         {
             SequenceNumber = seq.Increment(),
             OutputIndex = outputIndex,
-            RequestId = approvalResponse.Id,
+            RequestId = approvalResponse.RequestId,
             Approved = approvalResponse.Approved,
             ItemId = idGenerator.GenerateMessageId()
         };
