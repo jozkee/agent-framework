@@ -10,6 +10,7 @@ using Microsoft.Agents.AI.DevUI;
 using Microsoft.Agents.AI.Hosting;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
+using OpenAI.Responses;
 
 namespace DevUI_Step01_BasicUsage;
 
@@ -71,7 +72,7 @@ internal static class Program
         // Register sample agents with tools
         builder.AddAIAgent("assistant", "You are a helpful assistant. Answer questions concisely and accurately.")
             .WithAITools(
-                AIFunctionFactory.Create(GetWeather, name: "get_weather"),
+                new ApprovalRequiredAIFunction(AIFunctionFactory.Create(GetWeather, name: "get_weather")),
                 AIFunctionFactory.Create(GetCurrentTime, name: "get_current_time")
             );
 
@@ -79,6 +80,19 @@ internal static class Program
 
         builder.AddAIAgent("coder", "You are an expert programmer. Help users with coding questions and provide code examples.")
             .WithAITool(AIFunctionFactory.Create(Add, name: "add"));
+
+        // Register an agent backed by the Responses API with a hosted MCP tool requiring approval
+        var mcpTool = new HostedMcpServerTool("deepwiki", new Uri("https://mcp.deepwiki.com/mcp"))
+        {
+            ApprovalMode = HostedMcpServerToolApprovalMode.AlwaysRequire
+        };
+
+        var responsesClient = new AzureOpenAIClient(new Uri(endpoint), new DefaultAzureCredential())
+            .GetResponsesClient(deploymentName)
+            .AsIChatClient();
+
+        builder.AddAIAgent("mcp-wiki", "You answer questions by searching the deepwiki content.", responsesClient)
+            .WithAITool(mcpTool);
 
         // Register sample workflows
         var assistantBuilder = builder.AddAIAgent("workflow-assistant", "You are a helpful assistant in a workflow.");

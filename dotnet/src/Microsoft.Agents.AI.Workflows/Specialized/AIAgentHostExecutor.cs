@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft. All rights reserved.
+// Copyright (c) Microsoft. All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -19,7 +19,7 @@ internal sealed class AIAgentHostExecutor : ChatProtocolExecutor
     private AgentSession? _session;
     private bool? _currentTurnEmitEvents;
 
-    private AIContentExternalHandler<UserInputRequestContent, UserInputResponseContent>? _userInputHandler;
+    private AIContentExternalHandler<InputRequestContent, InputResponseContent>? _userInputHandler;
     private AIContentExternalHandler<FunctionCallContent, FunctionResultContent>? _functionCallHandler;
 
     private static readonly ChatProtocolExecutorOptions s_defaultChatProtocolOptions = new()
@@ -38,7 +38,7 @@ internal sealed class AIAgentHostExecutor : ChatProtocolExecutor
 
     private RouteBuilder ConfigureUserInputRoutes(RouteBuilder routeBuilder)
     {
-        this._userInputHandler = new AIContentExternalHandler<UserInputRequestContent, UserInputResponseContent>(
+        this._userInputHandler = new AIContentExternalHandler<InputRequestContent, InputResponseContent>(
             ref routeBuilder,
             portId: $"{this.Id}_UserInput",
             intercepted: this._options.InterceptUserInputRequests,
@@ -60,13 +60,13 @@ internal sealed class AIAgentHostExecutor : ChatProtocolExecutor
     }
 
     private ValueTask HandleUserInputResponseAsync(
-        UserInputResponseContent response,
+        InputResponseContent response,
         IWorkflowContext context,
         CancellationToken cancellationToken)
     {
-        if (!this._userInputHandler!.MarkRequestAsHandled(response.Id))
+        if (!this._userInputHandler!.MarkRequestAsHandled(response.RequestId))
         {
-            throw new InvalidOperationException($"No pending UserInputRequest found with id '{response.Id}'.");
+            throw new InvalidOperationException($"No pending UserInputRequest found with id '{response.RequestId}'.");
         }
 
         List<ChatMessage> implicitTurnMessages = [new ChatMessage(ChatRole.User, [response])];
@@ -165,7 +165,7 @@ internal sealed class AIAgentHostExecutor : ChatProtocolExecutor
     private async ValueTask<AgentResponse> InvokeAgentAsync(IEnumerable<ChatMessage> messages, IWorkflowContext context, bool emitEvents, CancellationToken cancellationToken = default)
     {
 #pragma warning disable MEAI001
-        Dictionary<string, UserInputRequestContent> userInputRequests = new();
+        Dictionary<string, InputRequestContent> userInputRequests = new();
         Dictionary<string, FunctionCallContent> functionCalls = new();
         AgentResponse response;
 
@@ -219,15 +219,15 @@ internal sealed class AIAgentHostExecutor : ChatProtocolExecutor
         {
             foreach (AIContent content in contents)
             {
-                if (content is UserInputRequestContent userInputRequest)
+                if (content is InputRequestContent userInputRequest)
                 {
                     // It is an error to simultaneously have multiple outstanding user input requests with the same ID.
-                    userInputRequests.Add(userInputRequest.Id, userInputRequest);
+                    userInputRequests.Add(userInputRequest.RequestId, userInputRequest);
                 }
-                else if (content is UserInputResponseContent userInputResponse)
+                else if (content is InputResponseContent userInputResponse)
                 {
                     // If the set of messages somehow already has a corresponding user input response, remove it.
-                    _ = userInputRequests.Remove(userInputResponse.Id);
+                    _ = userInputRequests.Remove(userInputResponse.RequestId);
                 }
                 else if (content is FunctionCallContent functionCall)
                 {
