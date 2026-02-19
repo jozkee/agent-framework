@@ -1,6 +1,8 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System;
+using System.Collections.Generic;
+using System.Text.Json;
 using Microsoft.Agents.AI.Hosting.OpenAI.Responses.Models;
 using Microsoft.Extensions.AI;
 
@@ -69,6 +71,22 @@ internal static class ItemContentConverter
                 new DataContent(inputAudio.Data, AudioFormatToMediaType(inputAudio.Format)),
             ItemContentOutputAudio outputAudio =>
                 new DataContent(outputAudio.Data, "audio/*"),
+
+            // Function approval response content
+#pragma warning disable MEAI001 // Type is for evaluation purposes only
+            ItemContentFunctionApprovalResponse approvalResponse =>
+                new FunctionApprovalResponseContent(
+                    approvalResponse.RequestId,
+                    approvalResponse.Approved,
+                    new FunctionCallContent(
+                        approvalResponse.FunctionCall.Id,
+                        approvalResponse.FunctionCall.Name,
+                        approvalResponse.FunctionCall.Arguments.ValueKind == JsonValueKind.Object
+                            ? (IDictionary<string, object?>?)JsonSerializer.Deserialize(
+                                approvalResponse.FunctionCall.Arguments,
+                                OpenAIHostingJsonUtilities.DefaultOptions.GetTypeInfo(typeof(IDictionary<string, object?>)))
+                            : null)),
+#pragma warning restore MEAI001 // Type is for evaluation purposes only
 
             _ => null
         };
