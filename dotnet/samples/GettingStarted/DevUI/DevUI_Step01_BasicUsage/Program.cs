@@ -70,6 +70,7 @@ internal static class Program
             => DateTime.Now.ToString("HH:mm:ss");
 
         // Register sample agents with tools
+        // Wrap GetWeather with ApprovalRequiredAIFunction to require user approval before invocation.
         builder.AddAIAgent("assistant", "You are a helpful assistant. Answer questions concisely and accurately.")
             .WithAITools(
                 new ApprovalRequiredAIFunction(AIFunctionFactory.Create(GetWeather, name: "get_weather")),

@@ -266,6 +266,7 @@ internal enum FunctionToolCallOutputItemResourceStatus
 [JsonDerivedType(typeof(ItemContentOutputText), "output_text")]
 [JsonDerivedType(typeof(ItemContentOutputAudio), "output_audio")]
 [JsonDerivedType(typeof(ItemContentRefusal), "refusal")]
+[JsonDerivedType(typeof(ItemContentToolApprovalResponse), "function_approval_response")]
 internal abstract class ItemContent
 {
     /// <summary>
@@ -441,6 +442,35 @@ internal sealed class ItemContentRefusal : ItemContent
     /// </summary>
     [JsonPropertyName("refusal")]
     public required string Refusal { get; init; }
+}
+
+/// <summary>
+/// Function approval response content.
+/// This is a non-standard DevUI extension for human-in-the-loop scenarios.
+/// </summary>
+internal sealed class ItemContentToolApprovalResponse : ItemContent
+{
+    /// <inheritdoc/>
+    [JsonIgnore]
+    public override string Type => "function_approval_response";
+
+    /// <summary>
+    /// The unique identifier of the approval request being responded to.
+    /// </summary>
+    [JsonPropertyName("request_id")]
+    public required string RequestId { get; init; }
+
+    /// <summary>
+    /// Whether the function call was approved.
+    /// </summary>
+    [JsonPropertyName("approved")]
+    public required bool Approved { get; init; }
+
+    /// <summary>
+    /// The tool call that was approved or rejected.
+    /// </summary>
+    [JsonPropertyName("function_call")]
+    public required ToolCallInfo ToolCall { get; init; }
 }
 
 // Additional ItemResource types from TypeSpec

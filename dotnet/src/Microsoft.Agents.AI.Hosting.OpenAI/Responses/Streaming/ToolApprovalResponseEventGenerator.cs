@@ -11,7 +11,7 @@ namespace Microsoft.Agents.AI.Hosting.OpenAI.Responses.Streaming;
 /// A generator for streaming events from function approval response content.
 /// This is a non-standard DevUI extension for human-in-the-loop scenarios.
 /// </summary>
-internal sealed class FunctionApprovalResponseEventGenerator(
+internal sealed class ToolApprovalResponseEventGenerator(
         IdGenerator idGenerator,
         SequenceNumber seq,
         int outputIndex) : StreamingEventGenerator
@@ -22,10 +22,10 @@ internal sealed class FunctionApprovalResponseEventGenerator(
     {
         if (content is not ToolApprovalResponseContent approvalResponse)
         {
-            throw new InvalidOperationException("FunctionApprovalResponseEventGenerator only supports ToolApprovalResponseContent.");
+            throw new InvalidOperationException("ToolApprovalResponseEventGenerator only supports ToolApprovalResponseContent.");
         }
 
-        yield return new StreamingFunctionApprovalResponded
+        yield return new StreamingToolApprovalResponded
         {
             SequenceNumber = seq.Increment(),
             OutputIndex = outputIndex,

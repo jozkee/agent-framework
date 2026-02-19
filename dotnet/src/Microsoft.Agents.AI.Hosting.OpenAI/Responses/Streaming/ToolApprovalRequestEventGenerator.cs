@@ -12,7 +12,7 @@ namespace Microsoft.Agents.AI.Hosting.OpenAI.Responses.Streaming;
 /// A generator for streaming events from function approval request content.
 /// This is a non-standard DevUI extension for human-in-the-loop scenarios.
 /// </summary>
-internal sealed class FunctionApprovalRequestEventGenerator(
+internal sealed class ToolApprovalRequestEventGenerator(
         IdGenerator idGenerator,
         SequenceNumber seq,
         int outputIndex,
@@ -24,30 +24,38 @@ internal sealed class FunctionApprovalRequestEventGenerator(
     {
         if (content is not ToolApprovalRequestContent approvalRequest)
         {
-            throw new InvalidOperationException("FunctionApprovalRequestEventGenerator only supports ToolApprovalRequestContent.");
+            throw new InvalidOperationException("ToolApprovalRequestEventGenerator only supports ToolApprovalRequestContent.");
         }
 
-        var (callId, name, arguments) = approvalRequest.ToolCall switch
+        ToolCallInfo toolCallInfo = approvalRequest.ToolCall switch
         {
-            FunctionCallContent fcc => (fcc.CallId, fcc.Name, fcc.Arguments),
-            McpServerToolCallContent mcp => (mcp.CallId, mcp.Name, mcp.Arguments),
+            McpServerToolCallContent mcp => new McpToolCallInfo
+            {
+                Id = mcp.CallId,
+                Name = mcp.Name,
+                Arguments = JsonSerializer.SerializeToElement(
+                    mcp.Arguments,
+                    jsonSerializerOptions.GetTypeInfo(typeof(IDictionary<string, object>))),
+                ServerName = mcp.ServerName!
+            },
+            FunctionCallContent fcc => new FunctionToolCallInfo
+            {
+                Id = fcc.CallId,
+                Name = fcc.Name,
+                Arguments = JsonSerializer.SerializeToElement(
+                    fcc.Arguments,
+                    jsonSerializerOptions.GetTypeInfo(typeof(IDictionary<string, object>)))
+            },
             _ => throw new InvalidOperationException($"Unsupported tool call type: {approvalRequest.ToolCall?.GetType().Name}")
         };
 
-        yield return new StreamingFunctionApprovalRequested
+        yield return new StreamingToolApprovalRequested
         {
             SequenceNumber = seq.Increment(),
             OutputIndex = outputIndex,
             RequestId = approvalRequest.RequestId,
             ItemId = idGenerator.GenerateMessageId(),
-            FunctionCall = new FunctionCallInfo
-            {
-                Id = callId,
-                Name = name,
-                Arguments = JsonSerializer.SerializeToElement(
-                    arguments,
-                    jsonSerializerOptions.GetTypeInfo(typeof(IDictionary<string, object>)))
-            }
+            ToolCall = toolCallInfo
         };
     }
 

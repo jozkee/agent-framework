@@ -1,6 +1,8 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System;
+using System.Collections.Generic;
+using System.Text.Json;
 using Microsoft.Agents.AI.Hosting.OpenAI.Responses.Models;
 using Microsoft.Extensions.AI;
 
@@ -69,6 +71,15 @@ internal static class ItemContentConverter
                 new DataContent(inputAudio.Data, AudioFormatToMediaType(inputAudio.Format)),
             ItemContentOutputAudio outputAudio =>
                 new DataContent(outputAudio.Data, "audio/*"),
+
+            // Function approval response content
+#pragma warning disable MEAI001 // Type is for evaluation purposes only
+            ItemContentToolApprovalResponse approvalResponse =>
+                new ToolApprovalResponseContent(
+                    approvalResponse.RequestId,
+                    approvalResponse.Approved,
+                    CreateToolCallContent(approvalResponse.ToolCall)),
+#pragma warning restore MEAI001 // Type is for evaluation purposes only
 
             _ => null
         };
@@ -158,5 +169,23 @@ internal static class ItemContentConverter
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Creates the appropriate <see cref="ToolCallContent"/> from a <see cref="ToolCallInfo"/>.
+    /// </summary>
+    private static ToolCallContent CreateToolCallContent(ToolCallInfo toolCall)
+    {
+        var arguments = toolCall.Arguments.ValueKind == JsonValueKind.Object
+            ? (IDictionary<string, object?>?)JsonSerializer.Deserialize(
+                toolCall.Arguments,
+                OpenAIHostingJsonUtilities.DefaultOptions.GetTypeInfo(typeof(IDictionary<string, object?>)))
+            : null;
+
+        return toolCall switch
+        {
+            McpToolCallInfo mcp => new McpServerToolCallContent(mcp.Id, mcp.Name, mcp.ServerName) { Arguments = arguments },
+            _ => new FunctionCallContent(toolCall.Id, toolCall.Name, arguments)
+        };
     }
 }
