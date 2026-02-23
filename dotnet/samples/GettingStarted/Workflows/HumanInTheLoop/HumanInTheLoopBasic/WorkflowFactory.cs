@@ -1,5 +1,6 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
+using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 
 namespace WorkflowHumanInTheLoopBasicSample;
@@ -7,7 +8,8 @@ namespace WorkflowHumanInTheLoopBasicSample;
 internal static class WorkflowFactory
 {
     /// <summary>
-    /// Get a workflow that plays a number guessing game with human-in-the-loop interaction.
+    /// Get a workflow that plays a number guessing game with human-in-the-loop interaction
+    /// using a low-level RequestPort.
     /// An input port allows the external world to provide inputs to the workflow upon requests.
     /// </summary>
     internal static Workflow BuildWorkflow()
@@ -21,6 +23,33 @@ internal static class WorkflowFactory
             .AddEdge(numberRequestPort, judgeExecutor)
             .AddEdge(judgeExecutor, numberRequestPort)
             .WithOutputFrom(judgeExecutor)
+            .Build();
+    }
+
+    /// <summary>
+    /// Get a workflow that plays a number guessing game with human-in-the-loop interaction
+    /// using MEAI <see cref="Microsoft.Extensions.AI.InputRequestContent"/> /
+    /// <see cref="Microsoft.Extensions.AI.InputResponseContent"/> types.
+    /// The <see cref="GuessingGameAgent"/> is hosted as a workflow executor via
+    /// <see cref="AIAgentBinding"/>, and the <c>AIAgentHostExecutor</c> automatically
+    /// routes <see cref="Microsoft.Extensions.AI.InputRequestContent"/> from the agent's
+    /// response to the external consumer.
+    /// </summary>
+    internal static Workflow BuildMeaiWorkflow()
+    {
+        // Create an AIAgent that uses InputRequestContent/InputResponseContent for HIL
+        GuessingGameAgent agent = new(targetNumber: 42);
+
+        // Bind the agent as a workflow executor - the AIAgentHostExecutor will automatically
+        // detect InputRequestContent in the agent's response and route it externally.
+        // EmitAgentResponseEvents enables us to observe the agent's text responses in the stream.
+        ExecutorBinding agentExecutor = agent.BindAsExecutor(new AIAgentHostOptions
+        {
+            EmitAgentResponseEvents = true
+        });
+
+        // Build a simple single-executor workflow
+        return new WorkflowBuilder(agentExecutor)
             .Build();
     }
 }
