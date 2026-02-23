@@ -24,6 +24,11 @@ internal sealed class InMemoryResponsesService : IResponsesService, IDisposable
     private readonly InMemoryStorageOptions _options;
     private readonly Conversations.IConversationStorage? _conversationStorage;
 
+    // Maps conversation IDs to the upstream conversation ID (e.g., Azure Responses API response ID)
+    // from the most recent response. This enables conversation continuity by forwarding
+    // the upstream ID as previous_response_id on subsequent requests.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _conversationUpstreamIds = new();
+
     private sealed class ResponseState
     {
         private readonly object _lock = new();
@@ -425,6 +430,14 @@ internal sealed class InMemoryResponsesService : IResponsesService, IDisposable
             // Create agent invocation context
             var context = new AgentInvocationContext(new IdGenerator(responseId: responseId, conversationId: state.Response?.Conversation?.Id));
 
+            // If we have a stored upstream conversation ID for this conversation, provide it
+            // to the executor so it can forward it as previous_response_id to the upstream service.
+            if (request.Conversation?.Id is string conversationId
+                && this._conversationUpstreamIds.TryGetValue(conversationId, out var upstreamId))
+            {
+                context.UpstreamConversationId = upstreamId;
+            }
+
             // Collect output items for conversation storage
             List<ItemResource> outputItems = [];
 
@@ -438,6 +451,12 @@ internal sealed class InMemoryResponsesService : IResponsesService, IDisposable
                 {
                     outputItems.Add(itemDone.Item);
                 }
+            }
+
+            // Store the upstream conversation ID for future requests in this conversation.
+            if (request.Conversation?.Id is string convId && context.UpstreamConversationId is not null)
+            {
+                this._conversationUpstreamIds[convId] = context.UpstreamConversationId;
             }
 
             // Add both input and output items to conversation storage if available

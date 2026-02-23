@@ -30,4 +30,11 @@ internal sealed class AgentInvocationContext(IdGenerator idGenerator, JsonSerial
     /// Gets the JSON serializer options.
     /// </summary>
     public JsonSerializerOptions JsonSerializerOptions { get; } = jsonSerializerOptions ?? OpenAIHostingJsonUtilities.DefaultOptions;
+
+    /// <summary>
+    /// Gets or sets the upstream conversation ID from the underlying AI service (e.g., the Azure Responses API response ID).
+    /// This is set by the service layer before execution if available from a previous response,
+    /// and updated by the executor during execution from the streaming response.
+    /// </summary>
+    public string? UpstreamConversationId { get; set; }
 }

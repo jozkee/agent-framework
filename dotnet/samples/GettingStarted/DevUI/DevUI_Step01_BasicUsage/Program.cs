@@ -3,6 +3,7 @@
 // This sample demonstrates basic usage of the DevUI in an ASP.NET Core application with AI agents.
 
 using System.ComponentModel;
+using System.Text.Json;
 using Azure.AI.OpenAI;
 using Azure.Identity;
 using Microsoft.Agents.AI;
@@ -90,7 +91,10 @@ internal static class Program
 
         var responsesClient = new AzureOpenAIClient(new Uri(endpoint), new DefaultAzureCredential())
             .GetResponsesClient(deploymentName)
-            .AsIChatClient();
+            .AsIChatClient()
+            .AsBuilder()
+            .Use(inner => new LoggingChatClient(inner))
+            .Build();
 
         builder.AddAIAgent("mcp-wiki", "You answer questions by searching the deepwiki content.", responsesClient)
             .WithAITool(mcpTool);
@@ -124,3 +128,60 @@ internal static class Program
         app.Run();
     }
 }
+
+#pragma warning disable MEAI001
+internal sealed class LoggingChatClient : DelegatingChatClient
+{
+    public LoggingChatClient(IChatClient inner) : base(inner) { }
+
+    private static void DumpMessages(string label, IEnumerable<ChatMessage> messages, ChatOptions? options)
+    {
+        Console.WriteLine($"\n{"".PadLeft(80, '=')}\n[LoggingChatClient] {label}\n{"".PadLeft(80, '-')}");
+        if (options?.ConversationId is not null)
+            Console.WriteLine($"  ConversationId: {options.ConversationId}");
+
+        foreach (var msg in messages)
+        {
+            Console.WriteLine($"  [{msg.Role}] MessageId={msg.MessageId} RawRep={msg.RawRepresentation?.GetType().Name ?? "null"}");
+            foreach (var content in msg.Contents)
+            {
+                var rawType = content.RawRepresentation?.GetType().Name ?? "null";
+                switch (content)
+                {
+                    case TextContent tc:
+                        Console.WriteLine($"    TextContent: \"{tc.Text?[..Math.Min(tc.Text.Length, 80)]}\" RawRep={rawType}");
+                        break;
+                    case ToolApprovalRequestContent tarc:
+                        Console.WriteLine($"    ToolApprovalRequestContent: RequestId={tarc.RequestId} ToolCall={tarc.ToolCall?.GetType().Name} RawRep={rawType}");
+                        break;
+                    case ToolApprovalResponseContent trc:
+                        Console.WriteLine($"    ToolApprovalResponseContent: RequestId={trc.RequestId} Approved={trc.Approved} ToolCall={trc.ToolCall?.GetType().Name} RawRep={rawType}");
+                        break;
+                    case FunctionCallContent fcc:
+                        Console.WriteLine($"    FunctionCallContent: CallId={fcc.CallId} Name={fcc.Name} RawRep={rawType}");
+                        break;
+                    default:
+                        Console.WriteLine($"    {content.GetType().Name} RawRep={rawType}");
+                        break;
+                }
+            }
+        }
+        Console.WriteLine($"{"".PadLeft(80, '=')}\n");
+    }
+
+    public override async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        DumpMessages("GetResponseAsync", messages, options);
+        return await base.GetResponseAsync(messages, options, cancellationToken);
+    }
+
+    public override async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        DumpMessages("GetStreamingResponseAsync", messages, options);
+        await foreach (var update in base.GetStreamingResponseAsync(messages, options, cancellationToken))
+        {
+            yield return update;
+        }
+    }
+}
+#pragma warning restore MEAI001

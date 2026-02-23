@@ -89,12 +89,12 @@ internal sealed class HostedAgentResponseExecutor : IResponseExecutor
 
         var chatOptions = new ChatOptions
         {
-            // Note: We intentionally do NOT set ConversationId on ChatOptions here.
-            // The conversation ID from the client request is used by the hosting layer
-            // to manage conversation storage, but should not be forwarded to the underlying
-            // IChatClient as it has its own concept of conversations (or none at all).
-            // ---
-            // ConversationId = request.Conversation?.Id,
+            // The hosting layer's conversation ID is NOT forwarded as ConversationId
+            // because it has a different meaning than the underlying AI service's conversation concept.
+            // However, if the context has an upstream ConversationId from a previous response
+            // (e.g., the Azure Responses API response ID), we forward it so the underlying
+            // client can set previous_response_id for conversation continuity.
+            ConversationId = context.UpstreamConversationId,
 
             Temperature = (float?)request.Temperature,
             TopP = (float?)request.TopP,
@@ -111,6 +111,7 @@ internal sealed class HostedAgentResponseExecutor : IResponseExecutor
         }
 
         await foreach (var streamingEvent in agent.RunStreamingAsync(messages, options: options, cancellationToken: cancellationToken)
+            .CaptureUpstreamConversationIdAsync(context)
             .ToStreamingResponseAsync(request, context, cancellationToken).ConfigureAwait(false))
         {
             yield return streamingEvent;
