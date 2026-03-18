@@ -196,7 +196,7 @@ internal static class AgentResponseUpdateExtensions
                         TextReasoningContent => new TextReasoningContentEventGenerator(context.IdGenerator, seq, outputIndex),
                         FunctionCallContent => new FunctionCallEventGenerator(context.IdGenerator, seq, outputIndex, context.JsonSerializerOptions),
                         FunctionResultContent => new FunctionResultEventGenerator(context.IdGenerator, seq, outputIndex),
-                        ToolApprovalRequestContent => new FunctionApprovalRequestEventGenerator(context.IdGenerator, seq, outputIndex, context.JsonSerializerOptions),
+                        ToolApprovalRequestContent => new FunctionApprovalRequestEventGenerator(seq, outputIndex, context.JsonSerializerOptions),
                         ToolApprovalResponseContent => new FunctionApprovalResponseEventGenerator(context.IdGenerator, seq, outputIndex),
                         ErrorContent => new ErrorContentEventGenerator(context.IdGenerator, seq, outputIndex),
                         UriContent uriContent when uriContent.HasTopLevelMediaType("image") => new ImageContentEventGenerator(context.IdGenerator, seq, outputIndex),
