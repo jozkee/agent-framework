@@ -266,6 +266,7 @@ internal enum FunctionToolCallOutputItemResourceStatus
 [JsonDerivedType(typeof(ItemContentOutputText), "output_text")]
 [JsonDerivedType(typeof(ItemContentOutputAudio), "output_audio")]
 [JsonDerivedType(typeof(ItemContentRefusal), "refusal")]
+[JsonDerivedType(typeof(ItemContentFunctionApprovalResponse), "function_approval_response")]
 internal abstract class ItemContent
 {
     /// <summary>
@@ -441,6 +442,35 @@ internal sealed class ItemContentRefusal : ItemContent
     /// </summary>
     [JsonPropertyName("refusal")]
     public required string Refusal { get; init; }
+}
+
+/// <summary>
+/// A function approval response content item.
+/// This is a DevUI extension for human-in-the-loop approval workflows.
+/// </summary>
+internal sealed class ItemContentFunctionApprovalResponse : ItemContent
+{
+    /// <inheritdoc/>
+    [JsonIgnore]
+    public override string Type => "function_approval_response";
+
+    /// <summary>
+    /// The ID of the approval request being responded to.
+    /// </summary>
+    [JsonPropertyName("request_id")]
+    public required string RequestId { get; init; }
+
+    /// <summary>
+    /// Whether the function call was approved.
+    /// </summary>
+    [JsonPropertyName("approved")]
+    public bool Approved { get; init; }
+
+    /// <summary>
+    /// The function call that was approved or rejected.
+    /// </summary>
+    [JsonPropertyName("function_call")]
+    public JsonElement? FunctionCall { get; init; }
 }
 
 // Additional ItemResource types from TypeSpec
@@ -808,6 +838,38 @@ internal sealed class MCPApprovalRequestItemResource : ItemResource
 
     /// <summary>
     /// A JSON string of arguments for the tool.
+    /// </summary>
+    [JsonPropertyName("arguments")]
+    public string? Arguments { get; init; }
+}
+
+/// <summary>
+/// A function call approval request item resource for storing local function approval requests in conversation history.
+/// </summary>
+internal sealed class FCCApprovalRequestItemResource : ItemResource
+{
+    /// <summary>
+    /// The constant item type identifier for FCC approval request items.
+    /// </summary>
+    public const string ItemType = "fcc_approval_request";
+
+    /// <inheritdoc/>
+    public override string Type => ItemType;
+
+    /// <summary>
+    /// The call ID of the function call.
+    /// </summary>
+    [JsonPropertyName("call_id")]
+    public string? CallId { get; init; }
+
+    /// <summary>
+    /// The name of the function.
+    /// </summary>
+    [JsonPropertyName("name")]
+    public string? Name { get; init; }
+
+    /// <summary>
+    /// A JSON string of arguments for the function.
     /// </summary>
     [JsonPropertyName("arguments")]
     public string? Arguments { get; init; }

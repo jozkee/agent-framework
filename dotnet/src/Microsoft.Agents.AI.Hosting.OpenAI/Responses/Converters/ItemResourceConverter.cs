@@ -45,6 +45,7 @@ internal sealed class ItemResourceConverter : JsonConverter<ItemResource>
             MCPApprovalRequestItemResource.ItemType => doc.Deserialize(OpenAIHostingJsonContext.Default.MCPApprovalRequestItemResource),
             MCPApprovalResponseItemResource.ItemType => doc.Deserialize(OpenAIHostingJsonContext.Default.MCPApprovalResponseItemResource),
             MCPCallItemResource.ItemType => doc.Deserialize(OpenAIHostingJsonContext.Default.MCPCallItemResource),
+            FCCApprovalRequestItemResource.ItemType => doc.Deserialize(OpenAIHostingJsonContext.Default.FCCApprovalRequestItemResource),
             ExecutorActionItemResource.ItemType => doc.Deserialize(OpenAIHostingJsonContext.Default.ExecutorActionItemResource),
             _ => null
         };
@@ -106,6 +107,9 @@ internal sealed class ItemResourceConverter : JsonConverter<ItemResource>
                 break;
             case MCPCallItemResource mcpCall:
                 JsonSerializer.Serialize(writer, mcpCall, OpenAIHostingJsonContext.Default.MCPCallItemResource);
+                break;
+            case FCCApprovalRequestItemResource fccApprovalRequest:
+                JsonSerializer.Serialize(writer, fccApprovalRequest, OpenAIHostingJsonContext.Default.FCCApprovalRequestItemResource);
                 break;
             case ExecutorActionItemResource executorAction:
                 JsonSerializer.Serialize(writer, executorAction, OpenAIHostingJsonContext.Default.ExecutorActionItemResource);

@@ -25,14 +25,49 @@ internal sealed class FunctionApprovalResponseEventGenerator(
             throw new InvalidOperationException("FunctionApprovalResponseEventGenerator only supports ToolApprovalResponseContent.");
         }
 
+        // Build ItemResource for MCP approval responses (spec-aligned storage).
+        // FCC approval responses are handled by FunctionInvokingChatClient and
+        // don't need a separate ItemResource.
+        ItemResource? item = approvalResponse.ToolCall switch
+        {
+            McpServerToolCallContent => new MCPApprovalResponseItemResource
+            {
+                Id = idGenerator.GenerateMessageId(),
+                ApprovalRequestId = approvalResponse.RequestId,
+                Approve = approvalResponse.Approved,
+            },
+            _ => null
+        };
+
+        if (item is not null)
+        {
+            yield return new StreamingOutputItemAdded
+            {
+                SequenceNumber = seq.Increment(),
+                OutputIndex = outputIndex,
+                Item = item
+            };
+        }
+
+        // Emit the custom DevUI event for the frontend
         yield return new StreamingFunctionApprovalResponded
         {
             SequenceNumber = seq.Increment(),
             OutputIndex = outputIndex,
             RequestId = approvalResponse.RequestId,
             Approved = approvalResponse.Approved,
-            ItemId = idGenerator.GenerateMessageId()
+            ItemId = item?.Id ?? idGenerator.GenerateMessageId()
         };
+
+        if (item is not null)
+        {
+            yield return new StreamingOutputItemDone
+            {
+                SequenceNumber = seq.Increment(),
+                OutputIndex = outputIndex,
+                Item = item
+            };
+        }
     }
 
     public override IEnumerable<StreamingResponseEvent> Complete() => [];

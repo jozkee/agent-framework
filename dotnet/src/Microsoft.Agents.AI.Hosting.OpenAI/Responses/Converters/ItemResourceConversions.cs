@@ -56,6 +56,29 @@ internal static class ItemResourceConversions
                     ]));
                     break;
 
+                case MCPApprovalRequestItemResource mcpApproval:
+                    var mcpArgs = ParseArguments(mcpApproval.Arguments);
+                    var mcpToolCall = new McpServerToolCallContent(
+                        mcpApproval.Id, mcpApproval.Name ?? string.Empty, mcpApproval.ServerLabel ?? string.Empty)
+                    {
+                        Arguments = mcpArgs
+                    };
+                    messages.Add(new ChatMessage(ChatRole.Assistant,
+                    [
+                        new ToolApprovalRequestContent(mcpApproval.Id, mcpToolCall)
+                    ]));
+                    break;
+
+                case FCCApprovalRequestItemResource fccApproval:
+                    var fccArgs = ParseArguments(fccApproval.Arguments);
+                    var fccToolCall = new FunctionCallContent(
+                        fccApproval.CallId ?? string.Empty, fccApproval.Name ?? string.Empty, fccArgs);
+                    messages.Add(new ChatMessage(ChatRole.Assistant,
+                    [
+                        new ToolApprovalRequestContent(fccApproval.Id, fccToolCall)
+                    ]));
+                    break;
+
                     // Skip all other item types (reasoning, executor_action, web_search, etc.)
                     // They are not relevant for conversation context.
             }

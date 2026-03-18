@@ -1250,6 +1250,86 @@ public sealed class OpenAIResponsesIntegrationTests : IAsyncDisposable
         Assert.Equal(ChatRole.User, mockChatClient.CallHistory[1][2].Role);
     }
 
+    /// <summary>
+    /// Verifies that MCP approval requests are stored in conversation history and replayed
+    /// on the next request, so the approval response can be matched by the downstream API.
+    /// This tests the fix for the "approval responses but weren't passed as input" error.
+    /// </summary>
+    [Fact]
+    public async Task CreateResponse_WithMcpApproval_SecondRequestIncludesApprovalRequestInHistoryAsync()
+    {
+        // Arrange
+        const string AgentName = "mcp-approval-memory-agent";
+        const string Instructions = "You are a helpful assistant.";
+        const string RequestId = "mcpr_test_123";
+        const string ToolName = "microsoft_docs_search";
+        const string CallId = "mcpr_test_123";
+        const string ServerName = "microsoft_learn";
+
+        // First call: agent returns MCP approval request
+        // Second call: agent returns text (after approval was granted)
+        var mockChatClient = new TestHelpers.SequentialContentMockChatClient((callIndex, messages) =>
+        {
+            if (callIndex == 0)
+            {
+                var mcpToolCall = new McpServerToolCallContent(CallId, ToolName, ServerName)
+                {
+                    Arguments = new Dictionary<string, object?> { ["query"] = "System.IO.Stream" }
+                };
+                return [new ToolApprovalRequestContent(RequestId, mcpToolCall)];
+            }
+
+            return [new TextContent("System.IO.Stream is an abstract base class for reading and writing bytes.")];
+        });
+
+        this._httpClient = await this.CreateTestServerWithCustomClientAndConversationsAsync(
+            AgentName, Instructions, mockChatClient);
+
+        // Create a conversation
+        string createConvJson = System.Text.Json.JsonSerializer.Serialize(
+            new { metadata = new { agent_id = AgentName } });
+        using StringContent createConvContent = new(createConvJson, Encoding.UTF8, "application/json");
+        HttpResponseMessage createConvResponse = await this._httpClient.PostAsync(
+            new Uri("/v1/conversations", UriKind.Relative), createConvContent);
+        Assert.True(createConvResponse.IsSuccessStatusCode);
+
+        string convJson = await createConvResponse.Content.ReadAsStringAsync();
+        using var convDoc = System.Text.Json.JsonDocument.Parse(convJson);
+        string conversationId = convDoc.RootElement.GetProperty("id").GetString()!;
+
+        // Act - First request: triggers MCP approval
+        await this.SendRawResponseAsync(AgentName, "What's System.IO.Stream?", conversationId, stream: false);
+
+        // Act - Second request: sends approval response (simulates DevUI approving)
+        await this.SendRawResponseAsync(AgentName, "approved", conversationId, stream: false);
+
+        // Assert
+        Assert.Equal(2, mockChatClient.CallHistory.Count);
+
+        // First call: should have just the user message
+        Assert.Single(mockChatClient.CallHistory[0]);
+        Assert.Equal(ChatRole.User, mockChatClient.CallHistory[0][0].Role);
+
+        // Second call: should include prior conversation history with the MCP approval request replayed
+        var secondCallMessages = mockChatClient.CallHistory[1];
+        Assert.True(secondCallMessages.Count >= 3,
+            $"Expected at least 3 messages (user + approval request + new user), got {secondCallMessages.Count}");
+
+        // Verify the MCP approval request was replayed in the conversation history
+        var approvalRequestMsg = secondCallMessages.FirstOrDefault(m =>
+            m.Role == ChatRole.Assistant &&
+            m.Contents.OfType<ToolApprovalRequestContent>().Any());
+        Assert.NotNull(approvalRequestMsg);
+
+        var approvalContent = approvalRequestMsg!.Contents.OfType<ToolApprovalRequestContent>().First();
+        Assert.Equal(RequestId, approvalContent.RequestId);
+        Assert.IsType<McpServerToolCallContent>(approvalContent.ToolCall);
+
+        var mcpCall = (McpServerToolCallContent)approvalContent.ToolCall;
+        Assert.Equal(ToolName, mcpCall.Name);
+        Assert.Equal(ServerName, mcpCall.ServerName);
+    }
+
     private async Task<HttpResponseMessage> SendRawResponseAsync(
         string agentName, string input, string conversationId, bool stream)
     {

@@ -755,4 +755,89 @@ internal static class TestHelpers
         {
         }
     }
+
+    /// <summary>
+    /// Mock implementation of IChatClient that returns different content per call
+    /// and records the full message history for each invocation.
+    /// Used for testing multi-turn conversation replay scenarios.
+    /// </summary>
+    internal sealed class SequentialContentMockChatClient : IChatClient
+    {
+        private readonly Func<int, IEnumerable<ChatMessage>, IList<AIContent>> _contentProvider;
+        private int _callIndex;
+
+        /// <summary>Each entry is the messages list received for that call.</summary>
+        public List<List<ChatMessage>> CallHistory { get; } = [];
+
+        /// <summary>
+        /// Creates a mock that invokes contentProvider(callIndex, messages) to determine the response content.
+        /// </summary>
+        public SequentialContentMockChatClient(Func<int, IEnumerable<ChatMessage>, IList<AIContent>> contentProvider)
+        {
+            this._contentProvider = contentProvider;
+        }
+
+        public ChatClientMetadata Metadata { get; } = new("Test", new Uri("https://test.example.com"), "test-model");
+
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            var messageList = messages.ToList();
+            this.CallHistory.Add(messageList);
+            var contents = this._contentProvider(this._callIndex++, messageList);
+            ChatMessage message = new(ChatRole.Assistant, contents.ToList());
+            ChatResponse response = new([message])
+            {
+                ModelId = "test-model",
+                FinishReason = ChatFinishReason.Stop,
+                Usage = new UsageDetails
+                {
+                    InputTokenCount = 10,
+                    OutputTokenCount = 5,
+                    TotalTokenCount = 15
+                }
+            };
+            return Task.FromResult(response);
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var messageList = messages.ToList();
+            this.CallHistory.Add(messageList);
+            await Task.Delay(1, cancellationToken);
+            var contents = this._contentProvider(this._callIndex++, messageList);
+
+            for (int i = 0; i < contents.Count; i++)
+            {
+                List<AIContent> updateContents = [contents[i]];
+                if (i == contents.Count - 1)
+                {
+                    updateContents.Add(new UsageContent(new UsageDetails
+                    {
+                        InputTokenCount = 10,
+                        OutputTokenCount = 5,
+                        TotalTokenCount = 15
+                    }));
+                }
+
+                yield return new ChatResponseUpdate
+                {
+                    Contents = updateContents,
+                    Role = ChatRole.Assistant
+                };
+            }
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null) =>
+            serviceType.IsInstanceOfType(this) ? this : null;
+
+        public void Dispose()
+        {
+        }
+    }
 }

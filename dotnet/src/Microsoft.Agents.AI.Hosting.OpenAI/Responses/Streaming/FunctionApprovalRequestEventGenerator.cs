@@ -13,7 +13,6 @@ namespace Microsoft.Agents.AI.Hosting.OpenAI.Responses.Streaming;
 /// This is a non-standard DevUI extension for human-in-the-loop scenarios.
 /// </summary>
 internal sealed class FunctionApprovalRequestEventGenerator(
-        IdGenerator idGenerator,
         SequenceNumber seq,
         int outputIndex,
         JsonSerializerOptions jsonSerializerOptions) : StreamingEventGenerator
@@ -27,22 +26,80 @@ internal sealed class FunctionApprovalRequestEventGenerator(
             throw new InvalidOperationException("FunctionApprovalRequestEventGenerator only supports ToolApprovalRequestContent.");
         }
 
-        FunctionCallContent functionCall = (FunctionCallContent)approvalRequest.ToolCall;
+        var functionCallInfo = approvalRequest.ToolCall switch
+        {
+            FunctionCallContent fcc => new FunctionCallInfo
+            {
+                Id = fcc.CallId,
+                Name = fcc.Name,
+                Arguments = fcc.Arguments is not null
+                    ? JsonSerializer.SerializeToElement(
+                        fcc.Arguments,
+                        jsonSerializerOptions.GetTypeInfo(typeof(IDictionary<string, object>)))
+                    : default
+            },
+            McpServerToolCallContent mcc => new FunctionCallInfo
+            {
+                Id = mcc.CallId,
+                Name = mcc.Name,
+                ServerLabel = mcc.ServerName,
+                Arguments = mcc.Arguments is not null
+                    ? JsonSerializer.SerializeToElement(
+                        mcc.Arguments,
+                        jsonSerializerOptions.GetTypeInfo(typeof(IDictionary<string, object>)))
+                    : default
+            },
+            _ => new FunctionCallInfo
+            {
+                Id = approvalRequest.ToolCall.CallId,
+                Name = approvalRequest.ToolCall.CallId,
+                Arguments = default
+            }
+        };
 
+        // Build the ItemResource for standard storage path
+        string? serializedArgs = functionCallInfo.Arguments.ValueKind != JsonValueKind.Undefined
+            ? functionCallInfo.Arguments.GetRawText() : null;
+
+        ItemResource item = functionCallInfo.ServerLabel is not null
+            ? new MCPApprovalRequestItemResource
+            {
+                Id = approvalRequest.RequestId,
+                ServerLabel = functionCallInfo.ServerLabel,
+                Name = functionCallInfo.Name,
+                Arguments = serializedArgs
+            }
+            : new FCCApprovalRequestItemResource
+            {
+                Id = approvalRequest.RequestId,
+                CallId = functionCallInfo.Id,
+                Name = functionCallInfo.Name,
+                Arguments = serializedArgs
+            };
+
+        // Emit standard output item events so storage picks these up automatically
+        yield return new StreamingOutputItemAdded
+        {
+            SequenceNumber = seq.Increment(),
+            OutputIndex = outputIndex,
+            Item = item
+        };
+
+        // Emit the custom DevUI event for the frontend approval dialog
         yield return new StreamingFunctionApprovalRequested
         {
             SequenceNumber = seq.Increment(),
             OutputIndex = outputIndex,
             RequestId = approvalRequest.RequestId,
-            ItemId = idGenerator.GenerateMessageId(),
-            FunctionCall = new FunctionCallInfo
-            {
-                Id = functionCall.CallId,
-                Name = functionCall.Name,
-                Arguments = JsonSerializer.SerializeToElement(
-                    functionCall.Arguments,
-                    jsonSerializerOptions.GetTypeInfo(typeof(IDictionary<string, object>)))
-            }
+            ItemId = item.Id,
+            FunctionCall = functionCallInfo
+        };
+
+        yield return new StreamingOutputItemDone
+        {
+            SequenceNumber = seq.Increment(),
+            OutputIndex = outputIndex,
+            Item = item
         };
     }
 

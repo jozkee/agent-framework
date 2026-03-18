@@ -109,6 +109,7 @@ internal static class OpenAIHostingJsonUtilities
 [JsonSerializable(typeof(MCPApprovalRequestItemResource))]
 [JsonSerializable(typeof(MCPApprovalResponseItemResource))]
 [JsonSerializable(typeof(MCPCallItemResource))]
+[JsonSerializable(typeof(FCCApprovalRequestItemResource))]
 [JsonSerializable(typeof(ExecutorActionItemResource))]
 [JsonSerializable(typeof(List<ItemResource>))]
 // ItemParam types
@@ -147,6 +148,7 @@ internal static class OpenAIHostingJsonUtilities
 [JsonSerializable(typeof(ItemContentOutputText))]
 [JsonSerializable(typeof(ItemContentOutputAudio))]
 [JsonSerializable(typeof(ItemContentRefusal))]
+[JsonSerializable(typeof(ItemContentFunctionApprovalResponse))]
 [JsonSerializable(typeof(TextConfiguration))]
 [JsonSerializable(typeof(ResponseTextFormatConfiguration))]
 [JsonSerializable(typeof(ResponseTextFormatConfigurationText))]
